@@ -17,13 +17,16 @@ function __map_optimizer_args(prob::OptimizationCache, opt::CMAEvolutionStrategy
     maxiters::Union{Number, Nothing} = nothing,
     maxtime::Union{Number, Nothing} = nothing,
     abstol::Union{Number, Nothing} = nothing,
-    reltol::Union{Number, Nothing} = nothing)
+    reltol::Union{Number, Nothing} = nothing,
+    s0::Number = 0.1, # capture it here so it isn't include s0 as one of kwargs
+    kwargs...)
     if !isnothing(reltol)
         @warn "common reltol is currently not used by $(opt)"
     end
 
-    mapped_args = (; lower = prob.lb,
-        upper = prob.ub)
+    mapped_args = (; kwargs...)
+
+    mapped_args = (; mapped_args..., lower = prob.lb, upper = prob.ub)
 
     if !isnothing(maxiters)
         mapped_args = (; mapped_args..., maxiter = maxiters)
@@ -88,7 +91,7 @@ function SciMLBase.__solve(cache::OptimizationCache{
 
     _loss = function (θ)
         x = cache.f(θ, cache.p, cur...)
-        return first(x)
+        return x
     end
 
     opt_args = __map_optimizer_args(cache, cache.opt; callback = _cb, cache.solver_args...,
@@ -96,7 +99,7 @@ function SciMLBase.__solve(cache::OptimizationCache{
         maxtime = maxtime)
 
     t0 = time()
-    opt_res = CMAEvolutionStrategy.minimize(_loss, cache.u0, 0.1; opt_args...)
+    opt_res = CMAEvolutionStrategy.minimize(_loss, cache.u0, cache.solver_args.s0; opt_args...)
     t1 = time()
 
     opt_ret = opt_res.stop.reason
